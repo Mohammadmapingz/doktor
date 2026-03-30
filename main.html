@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8">
+  <title>Pasientregister</title>
+  <style>
+    body { font-family: Arial; margin: 20px; }
+    input, select, textarea, button { display: block; margin: 5px 0; padding: 5px; width: 300px; }
+    .patient-card { border: 1px solid #ccc; padding: 10px; margin: 5px 0; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h2>Registrer pasient</h2>
+  <input id="fnr" placeholder="Fødselsnummer">
+  <input id="fullname" placeholder="Fullt navn">
+  <input id="address" placeholder="Adresse">
+  <input id="postcode" placeholder="Postnummer">
+  <input id="city" placeholder="Poststed">
+  <input id="phone" placeholder="Telefonnummer">
+  <input id="birthyear" type="number" placeholder="Fødselsår">
+  
+  <div id="parentsInfo" style="display:none;">
+    <h4>Foreldre info (under 18 år)</h4>
+    <input id="parent1" placeholder="Forelder 1 navn">
+    <input id="parent1email" placeholder="Forelder 1 email">
+    <input id="parent1phone" placeholder="Forelder 1 telefon">
+    <input id="parent2" placeholder="Forelder 2 navn">
+    <input id="parent2email" placeholder="Forelder 2 email">
+    <input id="parent2phone" placeholder="Forelder 2 telefon">
+  </div>
+  <button onclick="registerPatient()">Registrer pasient</button>
+
+  <h2>Søk pasient</h2>
+  <input id="search" placeholder="Skriv navn" oninput="searchPatient()">
+  <div id="searchResults"></div>
+
+  <h2>Kalender</h2>
+  <input type="date" id="calendarDate" onchange="showAppointments()">
+  <div id="calendarResults"></div>
+
+  <script>
+    let patients = JSON.parse(localStorage.getItem("patients") || "[]");
+    let appointments = JSON.parse(localStorage.getItem("appointments") || "[]");
+
+    const birthYearInput = document.getElementById("birthyear");
+    const parentsInfo = document.getElementById("parentsInfo");
+
+    birthYearInput.addEventListener("input", () => {
+      const age = new Date().getFullYear() - birthYearInput.value;
+      parentsInfo.style.display = age < 18 ? "block" : "none";
+    });
+
+    function registerPatient() {
+      const patient = {
+        id: Date.now(),
+        fnr: document.getElementById("fnr").value,
+        fullname: document.getElementById("fullname").value,
+        address: document.getElementById("address").value,
+        postcode: document.getElementById("postcode").value,
+        city: document.getElementById("city").value,
+        phone: document.getElementById("phone").value,
+        birthyear: document.getElementById("birthyear").value,
+        parents: {}
+      };
+
+      if(parentsInfo.style.display === "block") {
+        patient.parents = {
+          parent1: document.getElementById("parent1").value,
+          parent1email: document.getElementById("parent1email").value,
+          parent1phone: document.getElementById("parent1phone").value,
+          parent2: document.getElementById("parent2").value,
+          parent2email: document.getElementById("parent2email").value,
+          parent2phone: document.getElementById("parent2phone").value,
+        };
+      }
+
+      patients.push(patient);
+      localStorage.setItem("patients", JSON.stringify(patients));
+      alert("Pasient registrert!");
+    }
+
+    function searchPatient() {
+      const query = document.getElementById("search").value.toLowerCase();
+      const resultsDiv = document.getElementById("searchResults");
+      resultsDiv.innerHTML = "";
+      patients.filter(p => p.fullname.toLowerCase().includes(query))
+              .forEach(p => {
+                const div = document.createElement("div");
+                div.className = "patient-card";
+                div.textContent = p.fullname;
+                div.onclick = () => { window.location.href = `pasient.html?id=${p.id}`; }
+                resultsDiv.appendChild(div);
+              });
+    }
+
+    function showAppointments() {
+      const date = document.getElementById("calendarDate").value;
+      const resultsDiv = document.getElementById("calendarResults");
+      resultsDiv.innerHTML = "";
+      appointments.filter(a => a.date === date)
+                  .forEach(a => {
+                    const div = document.createElement("div");
+                    div.textContent = `${a.time} - ${a.patientName}`;
+                    div.style.cursor = "pointer";
+                    div.onclick = () => { window.location.href = `pasient.html?id=${a.patientId}`; }
+                    resultsDiv.appendChild(div);
+                  });
+    }
+  </script>
+</body>
+</html>

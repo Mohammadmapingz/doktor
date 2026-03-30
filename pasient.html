@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<title>Pasientinfo</title>
+<style>
+  body { font-family: Arial; margin: 20px; }
+  button { margin: 5px; padding: 10px; cursor: pointer; }
+  .prescription-card { border: 1px solid #ccc; padding: 10px; margin: 5px 0; }
+</style>
+</head>
+<body>
+<h2>Pasientinfo</h2>
+<div id="patientInfo"></div>
+
+<h3>Funksjoner</h3>
+<button onclick="goTo('appointments')">Timer</button>
+<button onclick="goTo('journal')">Epikrise/Journal</button>
+<button onclick="goTo('referral')">Henvisning</button>
+<button onclick="editPatient()">Rediger info om pasient</button>
+
+<h3>Resepter</h3>
+<div>
+  <input id="medSearch" placeholder="Skriv for å søke medisin..." oninput="filterMeds()">
+  <div id="medList"></div>
+  <label>Farge/type:</label>
+  <select id="medType">
+    <option value="Blå">Blå</option>
+    <option value="Hvit">Hvit</option>
+    <option value="Rød">Rød</option>
+  </select>
+  <textarea id="notes" placeholder="Notater"></textarea>
+  <input id="securityCode" placeholder="Sikkerhetskode" type="password">
+  <button onclick="addPrescription()">Legg til resept</button>
+</div>
+
+<div id="savedPrescriptions"></div>
+
+<script>
+  const urlParams = new URLSearchParams(window.location.search);
+  const patientId = urlParams.get('id');
+
+  let patients = JSON.parse(localStorage.getItem("patients") || "[]");
+  let patient = patients.find(p => p.id == patientId);
+
+  const patientInfoDiv = document.getElementById("patientInfo");
+
+  const meds = ["Nexium", "Montelukast", "Paracet", "Ibux", "Voltaren", "Penicillin", "Zyrtec", "Claritin", "Prednisolon", "Metformin"];
+  const medListDiv = document.getElementById("medList");
+
+  function showPatientInfo() {
+    patientInfoDiv.innerHTML = `
+      <p>Fødselsnummer: ${patient.fnr}</p>
+      <p>Navn: ${patient.fullname}</p>
+      <p>Fødselsår: ${patient.birthyear}</p>
+      <p>Adresse: ${patient.address}, ${patient.postcode} ${patient.city}</p>
+      <p>Telefon: ${patient.phone}</p>
+    `;
+  }
+
+  function goTo(page) {
+    if(page === 'appointments') {
+      const time = prompt("Dato og tid (f.eks. 2026-03-30 11:20):");
+      const reason = prompt("Grunn for timen:");
+      const notes = prompt("Notater:");
+      let appointments = JSON.parse(localStorage.getItem("appointments") || "[]");
+      appointments.push({date: time.split(' ')[0], time: time.split(' ')[1], patientName: patient.fullname, patientId: patient.id, reason, notes});
+      localStorage.setItem("appointments", JSON.stringify(appointments));
+      alert("Time lagret!");
+    } else if(page === 'journal') {
+      window.location.href = `journal.html?id=${patient.id}`;
+    } else if(page === 'referral') {
+      window.location.href = `henvisning.html?id=${patient.id}`;
+    }
+  }
+
+  function editPatient() {
+    patient.fnr = prompt("Fødselsnummer:", patient.fnr);
+    patient.fullname = prompt("Navn:", patient.fullname);
+    patient.address = prompt("Adresse:", patient.address);
+    patient.postcode = prompt("Postnummer:", patient.postcode);
+    patient.city = prompt("Poststed:", patient.city);
+    patient.phone = prompt("Telefon:", patient.phone);
+    localStorage.setItem("patients", JSON.stringify(patients));
+    showPatientInfo();
+  }
+
+  // ---- RESEPTER ----
+  function filterMeds() {
+    const query = document.getElementById("medSearch").value.toLowerCase();
+    medListDiv.innerHTML = "";
+    meds.filter(m => m.toLowerCase().includes(query)).forEach(m => {
+      const div = document.createElement("div");
+      div.textContent = m;
+      div.style.cursor = "pointer";
+      div.onclick = () => { document.getElementById("medSearch").value = m; medListDiv.innerHTML = ""; }
+      medListDiv.appendChild(div);
+    });
+  }
+
+  function addPrescription() {
+    const med = document.getElementById("medSearch").value;
+    const type = document.getElementById("medType").value;
+    const notes = document.getElementById("notes").value;
+    const code = document.getElementById("securityCode").value;
+
+    if(code !== "1518") {
+      alert("Feil sikkerhetskode!");
+      return;
+    }
+    if(!med) {
+      alert("Velg medisin!");
+      return;
+    }
+
+    let prescriptions = JSON.parse(localStorage.getItem("prescriptions") || "[]");
+    prescriptions.push({patientId, med, type, notes, active: true});
+    localStorage.setItem("prescriptions", JSON.stringify(prescriptions));
+    document.getElementById("medSearch").value = "";
+    document.getElementById("notes").value = "";
+    document.getElementById("securityCode").value = "";
+    showPrescriptions();
+  }
+
+  function showPrescriptions() {
+    const savedDiv = document.getElementById("savedPrescriptions");
+    const prescriptions = JSON.parse(localStorage.getItem("prescriptions") || "[]")
+                               .filter(p => p.patientId == patientId);
+    savedDiv.innerHTML = "";
+    prescriptions.forEach((p, index) => {
+      const div = document.createElement("div");
+      div.className = "prescription-card";
+      div.innerHTML = `
+        <p>Medisin: ${p.med} (${p.type})</p>
+        <p>Notater: ${p.notes}</p>
+        <p>Status: ${p.active ? "Aktiv" : "Paused"}</p>
+        <button onclick="togglePrescription(${index})">${p.active ? "Pause" : "Aktiver"}</button>
+        <button onclick="deletePrescription(${index})">Slett</button>
+      `;
+      savedDiv.appendChild(div);
+    });
+  }
+
+  function togglePrescription(index) {
+    let prescriptions = JSON.parse(localStorage.getItem("prescriptions") || "[]")
+                               .filter(p => p.patientId == patientId);
+    prescriptions[index].active = !prescriptions[index].active;
+
+    // Oppdater full liste i localStorage
+    let allPrescriptions = JSON.parse(localStorage.getItem("prescriptions") || "[]");
+    allPrescriptions = allPrescriptions.map(p => p.patientId == patientId && p.med == prescriptions[index].med && p.notes == prescriptions[index].notes ? prescriptions[index] : p);
+    localStorage.setItem("prescriptions", JSON.stringify(allPrescriptions));
+
+    showPrescriptions();
+  }
+
+  function deletePrescription(index) {
+    let prescriptions = JSON.parse(localStorage.getItem("prescriptions") || "[]");
+    let filtered = prescriptions.filter((p,i) => !(p.patientId == patientId && i === index));
+    localStorage.setItem("prescriptions", JSON.stringify(filtered));
+    showPrescriptions();
+  }
+
+  showPatientInfo();
+  showPrescriptions();
+</script>
+</body>
+</html>

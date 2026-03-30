@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<title>Pasient Journal</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  body { font-family: Arial; margin: 40px; }
+  .container { max-width: 900px; margin: auto; }
+  h1, h2 { text-align: center; }
+  input, textarea, button, select { width: 100%; margin: 5px 0; padding: 6px; }
+  .card { border: 1px solid #ccc; padding: 10px; margin: 10px 0; background: #f4f4f4; }
+  .section { border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Pasient Journal / Henvisninger / Timer</h1>
+
+  <div id="patientInfo" class="section"></div>
+
+  <!-- JOURNAL -->
+  <h2>Ny journal / epikrise</h2>
+  <input id="title" placeholder="Tittel">
+  <textarea id="diagnosis" placeholder="Diagnoser"></textarea>
+  <textarea id="anamnesis" placeholder="Anamnese"></textarea>
+  <textarea id="plan" placeholder="Framtidsplan / behandling"></textarea>
+  <input id="date" placeholder="Dato (DD/MM/ÅÅÅÅ)">
+  <button onclick="saveJournal()">Lagre journal</button>
+
+  <h3>Tidligere journaler</h3>
+  <div id="savedJournals"></div>
+
+  <!-- HENVISNING -->
+  <h2>Henvisning</h2>
+  <select id="hospital">
+    <option>Akershus universitetssykehus</option>
+    <option>Oslo universitetssykehus</option>
+  </select>
+  <select id="department">
+    <option>Øre-nese-hals sengeområde</option>
+    <option>Øre-nese-hals poliklinikk</option>
+    <option>Øre-nese-hals søvnseksjon</option>
+    <option>Barne- og ungdomsklinikken</option>
+  </select>
+  <input id="reason" placeholder="Grunn for henvisning">
+  <button onclick="saveReferral()">Lagre henvisning</button>
+
+  <h3>Tidligere henvisninger</h3>
+  <div id="savedReferrals"></div>
+
+  <!-- TIMER -->
+  <h2>Timer</h2>
+  <input id="apptDate" placeholder="Dato (DD/MM/ÅÅÅÅ)">
+  <input id="apptTime" placeholder="Tid (f.eks 11:20)">
+  <input id="apptReason" placeholder="Grunn for timen">
+  <textarea id="apptNotes" placeholder="Notater"></textarea>
+  <button onclick="saveAppointment()">Lagre time</button>
+
+  <h3>Tidligere timer</h3>
+  <div id="savedAppointments"></div>
+
+</div>
+
+<script>
+const { jsPDF } = window.jspdf;
+const urlParams = new URLSearchParams(window.location.search);
+const patientId = urlParams.get('id');
+
+let patients = JSON.parse(localStorage.getItem("patients") || "[]");
+let patient = patients.find(p => p.id == patientId);
+
+document.getElementById("patientInfo").innerHTML = `
+  <p><strong>Pasient:</strong> ${patient.fullname}</p>
+  <p><strong>Fødselsnummer:</strong> ${patient.fnr}</p>
+  <p><strong>Adresse:</strong> ${patient.address}, ${patient.postcode} ${patient.city}</p>
+`;
+
+// ---------- JOURNAL ----------
+function saveJournal() {
+  const title = document.getElementById("title").value;
+  const diagnosis = document.getElementById("diagnosis").value;
+  const anamnesis = document.getElementById("anamnesis").value;
+  const plan = document.getElementById("plan").value;
+  const date = document.getElementById("date").value;
+  if(!title||!diagnosis||!anamnesis||!plan||!date) { alert("Fyll ut alle feltene"); return; }
+  let journals = JSON.parse(localStorage.getItem("journal")||"[]");
+  journals.push({patientId,title,diagnosis,anamnesis,plan,date});
+  localStorage.setItem("journal",JSON.stringify(journals));
+  document.getElementById("title").value="";
+  document.getElementById("diagnosis").value="";
+  document.getElementById("anamnesis").value="";
+  document.getElementById("plan").value="";
+  document.getElementById("date").value="";
+  showJournals();
+}
+
+function showJournals() {
+  const div = document.getElementById("savedJournals");
+  const journals = JSON.parse(localStorage.getItem("journal")||"[]").filter(j=>j.patientId==patientId);
+  div.innerHTML="";
+  journals.forEach((j,i)=>{
+    const card=document.createElement("div");
+    card.className="card";
+    card.innerHTML=`
+      <p><strong>Tittel:</strong> ${j.title}</p>
+      <p><strong>Dato:</strong> ${j.date}</p>
+      <p><strong>Diagnoser:</strong> ${j.diagnosis}</p>
+      <p><strong>Anamnese:</strong> ${j.anamnesis}</p>
+      <p><strong>Framtidsplan:</strong> ${j.plan}</p>
+      <button onclick="downloadJournal(${i})">Lag PDF</button>
+    `;
+    div.appendChild(card);
+  });
+}
+
+function downloadJournal(index){
+  let journals = JSON.parse(localStorage.getItem("journal")||"[]").filter(j=>j.patientId==patientId);
+  let j=journals[index];
+  const doc = new jsPDF();
+  let y=10;
+  doc.setFontSize(12);
+  doc.text("Epikrise",10,y); y+=10;
+  doc.text(`Pasient: ${patient.fullname}`,10,y); y+=10;
+  doc.text(`Fødselsnummer: ${patient.fnr}`,10,y); y+=10;
+  doc.text(`Adresse: ${patient.address}, ${patient.postcode} ${patient.city}`,10,y); y+=10;
+  doc.text("Overlege: Mohammad Arkan Osman",10,y); y+=10;
+  doc.text("Akershus universitetssykehus, Øre-nese-hals poliklinikk",10,y); y+=15;
+  doc.text(`Tittel: ${j.title}`,10,y); y+=10;
+  doc.text(`Diagnoser: ${j.diagnosis}`,10,y); y+=10;
+  doc.text(`Anamnese: ${j.anamnesis}`,10,y); y+=10;
+  doc.text(`Framtidsplan: ${j.plan}`,10,y); y+=10;
+  doc.text(`Dato: ${j.date}`,10,y);
+  doc.save(`${patient.fullname}_epikrise.pdf`);
+}
+
+// ---------- HENVISNING ----------
+function saveReferral(){
+  const hospital=document.getElementById("hospital").value;
+  const department=document.getElementById("department").value;
+  const reason=document.getElementById("reason").value;
+  if(!reason){alert("Fyll inn grunn"); return;}
+  let refs=JSON.parse(localStorage.getItem("referrals")||"[]");
+  refs.push({patientId,hospital,department,reason});
+  localStorage.setItem("referrals",JSON.stringify(refs));
+  document.getElementById("reason").value="";
+  showReferrals();
+}
+
+function showReferrals(){
+  const div=document.getElementById("savedReferrals");
+  const refs=JSON.parse(localStorage.getItem("referrals")||"[]").filter(r=>r.patientId==patientId);
+  div.innerHTML="";
+  refs.forEach(r=>{
+    const card=document.createElement("div");
+    card.className="card";
+    card.innerHTML=`<p><strong>Sykehus:</strong> ${r.hospital}</p>
+                    <p><strong>Avdeling:</strong> ${r.department}</p>
+                    <p><strong>Grunn:</strong> ${r.reason}</p>`;
+    div.appendChild(card);
+  });
+}
+
+// ---------- TIMER ----------
+function saveAppointment(){
+  const date=document.getElementById("apptDate").value;
+  const time=document.getElementById("apptTime").value;
+  const reason=document.getElementById("apptReason").value;
+  const notes=document.getElementById("apptNotes").value;
+  if(!date||!time||!reason){alert("Fyll ut dato, tid og grunn"); return;}
+  let appts=JSON.parse(localStorage.getItem("appointments")||"[]");
+  appts.push({patientId,date,time,reason,notes});
+  localStorage.setItem("appointments",JSON.stringify(appts));
+  document.getElementById("apptDate").value="";
+  document.getElementById("apptTime").value="";
+  document.getElementById("apptReason").value="";
+  document.getElementById("apptNotes").value="";
+  showAppointments();
+}
+
+function showAppointments(){
+  const div=document.getElementById("savedAppointments");
+  const appts=JSON.parse(localStorage.getItem("appointments")||"[]").filter(a=>a.patientId==patientId);
+  div.innerHTML="";
+  appts.forEach(a=>{
+    const card=document.createElement("div");
+    card.className="card";
+    card.innerHTML=`<p><strong>Dato:</strong> ${a.date}</p>
+                    <p><strong>Tid:</strong> ${a.time}</p>
+                    <p><strong>Grunn:</strong> ${a.reason}</p>
+                    <p><strong>Notater:</strong> ${a.notes}</p>`;
+    div.appendChild(card);
+  });
+}
+
+// Vis alt når siden lastes
+showJournals();
+showReferrals();
+showAppointments();
+</script>
+</body>
+</html>

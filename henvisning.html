@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<title>Henvisning</title>
+<style>
+  body { font-family: Arial; margin: 20px; }
+  select, input, textarea, button { display: block; margin: 5px 0; padding: 5px; width: 300px; }
+</style>
+</head>
+<body>
+<h2>Henvisning</h2>
+<div id="patientName"></div>
+
+<select id="hospital">
+  <option value="Akershus universitetssykehus">Akershus universitetssykehus</option>
+</select>
+
+<select id="department">
+  <option value="Øre-nese-hals sengeområde">Øre-nese-hals sengeområde</option>
+  <option value="Øre-nese-hals poliklinikk">Øre-nese-hals poliklinikk</option>
+  <option value="Øre-nese-hals søvnseksjon">Øre-nese-hals søvnseksjon</option>
+  <option value="Barne- og ungdomsklinikken">Barne- og ungdomsklinikken</option>
+</select>
+
+<input id="referralReason" placeholder="Grunn for henvisning">
+<button onclick="saveReferral()">Lagre henvisning</button>
+
+<script>
+  const urlParams = new URLSearchParams(window.location.search);
+  const patientId = urlParams.get('id');
+  let patients = JSON.parse(localStorage.getItem("patients") || "[]");
+  let patient = patients.find(p => p.id == patientId);
+  document.getElementById("patientName").textContent = `Pasient: ${patient.fullname}`;
+
+  function saveReferral() {
+    const hospital = document.getElementById("hospital").value;
+    const department = document.getElementById("department").value;
+    const reason = document.getElementById("referralReason").value;
+    let referrals = JSON.parse(localStorage.getItem("referrals") || "[]");
+    referrals.push({patientId, hospital, department, reason});
+    localStorage.setItem("referrals", JSON.stringify(referrals));
+    alert("Henvisning lagret!");
+  }
+</script>
+</body>
+</html>
