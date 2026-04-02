@@ -49,6 +49,9 @@ button { padding:8px; margin:5px 0; cursor:pointer; }
 <div id="medicationList"></div>
 
 <h3>Epikrise (tekstfelt)</h3>
+<!-- Logo øverst -->
+<img src="Akershus University Hospital logo.svg" alt="Ahus logo" style="width:150px; display:block; margin-bottom:10px;">
+
 <input id="epiTitle" placeholder="Tittel">
 <input id="epiDiagnosis" placeholder="Diagnoser">
 <textarea id="epiAnamnesis" placeholder="Anamnese"></textarea>
@@ -56,6 +59,9 @@ button { padding:8px; margin:5px 0; cursor:pointer; }
 
 <label for="epiRefSelect">Velg relevant henvisning:</label>
 <select id="epiRefSelect"></select>
+
+<label for="epiTimeSelect">Velg relevant time:</label>
+<select id="epiTimeSelect"></select>
 
 <input id="epiDoctor" placeholder="Lege som skriver epikrise">
 
@@ -88,6 +94,7 @@ function addAppointment(){
     appointments.push({patientId,date,time,reason,notes});
     localStorage.setItem("appointments", JSON.stringify(appointments));
     renderAppointments();
+    loadAppointmentOptions();
     appointmentDate.value=""; appointmentTime.value=""; appointmentReason.value=""; appointmentNotes.value="";
 }
 
@@ -161,6 +168,14 @@ function loadReferralOptions(){
     });
 }
 
+function loadAppointmentOptions(){
+    const apps = JSON.parse(localStorage.getItem("appointments")||"[]").filter(a=>a.patientId==patientId);
+    epiTimeSelect.innerHTML = "<option value=''>Ingen</option>";
+    apps.forEach((a,i)=>{
+        epiTimeSelect.innerHTML += `<option value="${i}">${a.date} ${a.time} - ${a.reason}</option>`;
+    });
+}
+
 function addEpikrise(){
     const title = epiTitle.value;
     const diagnosis = epiDiagnosis.value;
@@ -169,8 +184,12 @@ function addEpikrise(){
     const doctor = epiDoctor.value || "Ukjent lege";
 
     const refs = JSON.parse(localStorage.getItem("referrals")||"[]").filter(r=>r.patientId==patientId);
-    const selectedIndex = epiRefSelect.value;
-    const relevantRef = selectedIndex !== "" ? refs[selectedIndex] : null;
+    const selectedRefIndex = epiRefSelect.value;
+    const relevantRef = selectedRefIndex !== "" ? refs[selectedRefIndex] : null;
+
+    const apps = JSON.parse(localStorage.getItem("appointments")||"[]").filter(a=>a.patientId==patientId);
+    const selectedAppIndex = epiTimeSelect.value;
+    const relevantApp = selectedAppIndex !== "" ? apps[selectedAppIndex] : null;
 
     let text = "======================\n";
     text += "EPIKRISE\n";
@@ -183,21 +202,18 @@ function addEpikrise(){
         text += `${relevantRef.hospital} - ${relevantRef.department}\nGrunn: ${relevantRef.reason}\nNotater: ${relevantRef.notes}\n\n`;
     }
 
-    // Timer
-    const appointments = JSON.parse(localStorage.getItem("appointments")||"[]").filter(a=>a.patientId==patientId);
-    if(appointments.length>0){ 
-        text += "Timer:\n"; 
-        appointments.forEach(a=>{text+=`${a.date} ${a.time} - ${a.reason}\n`}); 
-        text+="\n"; 
+    if(relevantApp){
+        text += "Relevant time:\n";
+        text += `${relevantApp.date} ${relevantApp.time} - ${relevantApp.reason}\nNotater: ${relevantApp.notes}\n\n`;
     }
 
     epikriseText.innerText += text;
 
     const epikrisers = JSON.parse(localStorage.getItem("epikriser")||"[]");
-    epikrisers.push({patientId,title,diagnosis,anamnesis,plan,doctor,relevantRef});
+    epikrisers.push({patientId,title,diagnosis,anamnesis,plan,doctor,relevantRef,relevantApp});
     localStorage.setItem("epikriser", JSON.stringify(epikrisers));
 
-    epiTitle.value=""; epiDiagnosis.value=""; epiAnamnesis.value=""; epiPlan.value=""; epiDoctor.value=""; epiRefSelect.value="";
+    epiTitle.value=""; epiDiagnosis.value=""; epiAnamnesis.value=""; epiPlan.value=""; epiDoctor.value=""; epiRefSelect.value=""; epiTimeSelect.value="";
 }
 
 // --- INIT ---
@@ -206,6 +222,7 @@ renderAppointments();
 renderReferrals();
 renderMedications();
 loadReferralOptions();
+loadAppointmentOptions();
 </script>
 
 </body>
