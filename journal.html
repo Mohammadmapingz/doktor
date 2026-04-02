@@ -48,9 +48,8 @@ button { padding:8px; margin:5px 0; cursor:pointer; }
 <button onclick="addMedication()">Legg til resept</button>
 <div id="medicationList"></div>
 
-<h3>Epikrise (tekstfelt)</h3>
-<!-- Logo øverst -->
-<img src="https://www.ahus.no/49bab8/contentassets/a371fde577384b31ab07436ef56f123a/ahus-logo-norsk/bokmal---akershus-universitetssykehus---rgb.png"Ahus logo" style="width: 300px; display:block; margin-bottom:10px;">
+<h3>Epikrise (tekstfelt med logo)</h3>
+<div id="epikriseText" class="card" style="white-space: pre-line;"></div>
 
 <input id="epiTitle" placeholder="Tittel">
 <input id="epiDiagnosis" placeholder="Diagnoser">
@@ -64,9 +63,7 @@ button { padding:8px; margin:5px 0; cursor:pointer; }
 <select id="epiTimeSelect"></select>
 
 <input id="epiDoctor" placeholder="Lege som skriver epikrise">
-
 <button onclick="addEpikrise()">Legg til Epikrise</button>
-<div id="epikriseText"></div>
 
 </div>
 
@@ -176,6 +173,47 @@ function loadAppointmentOptions(){
     });
 }
 
+function renderEpikriser(){
+    const epikrisers = JSON.parse(localStorage.getItem("epikriser")||"[]").filter(e=>e.patientId==patientId);
+    epikriseText.innerHTML = ""; // bruker innerHTML for logo
+
+    epikrisers.forEach(e=>{
+        const div = document.createElement("div");
+        div.className = "card";
+
+        // Logo øverst
+        const logo = document.createElement("img");
+        logo.src = "https://www.ahus.no/49bab8/contentassets/a371fde577384b31ab07436ef56f123a/ahus-logo-norsk/bokmal---akershus-universitetssykehus---rgb.png";
+        logo.style.width = "250px";
+        logo.style.height = "auto";
+        logo.style.display = "block";
+        logo.style.marginBottom = "10px";
+        div.appendChild(logo);
+
+        let text = "======================\n";
+        text += "EPIKRISE\n";
+        text += `Pasient: ${patient.fullname}\nFødselsnummer: ${patient.fnr}\nAdresse: ${patient.address}, ${patient.postcode} ${patient.city}\n`;
+        text += `Overlege: ${e.doctor}\nAkershus universitetssykehus HF, Øre-nese-hals poliklinikk\n\n`;
+        text += `Tittel: ${e.title}\nDiagnoser: ${e.diagnosis}\nAnamnese: ${e.anamnesis}\nPlan: ${e.plan}\n\n`;
+
+        if(e.relevantRef){
+            text += "Relevant henvisning:\n";
+            text += `${e.relevantRef.hospital} - ${e.relevantRef.department}\nGrunn: ${e.relevantRef.reason}\nNotater: ${e.relevantRef.notes}\n\n`;
+        }
+
+        if(e.relevantApp){
+            text += "Relevant time:\n";
+            text += `${e.relevantApp.date} ${e.relevantApp.time} - ${e.relevantApp.reason}\nNotater: ${e.relevantApp.notes}\n\n`;
+        }
+
+        const pre = document.createElement("pre");
+        pre.innerText = text;
+        div.appendChild(pre);
+
+        epikriseText.appendChild(div);
+    });
+}
+
 function addEpikrise(){
     const title = epiTitle.value;
     const diagnosis = epiDiagnosis.value;
@@ -191,27 +229,11 @@ function addEpikrise(){
     const selectedAppIndex = epiTimeSelect.value;
     const relevantApp = selectedAppIndex !== "" ? apps[selectedAppIndex] : null;
 
-    let text = "======================\n";
-    text += "EPIKRISE\n";
-    text += `Pasient: ${patient.fullname}\nFødselsnummer: ${patient.fnr}\nAdresse: ${patient.address}, ${patient.postcode} ${patient.city}\n`;
-    text += `Overlege: ${doctor}\nAkershus universitetssykehus HF, Øre-nese-hals poliklinikk\n\n`;
-    text += `Tittel: ${title}\nDiagnoser: ${diagnosis}\nAnamnese: ${anamnesis}\nPlan: ${plan}\n\n`;
-
-    if(relevantRef){
-        text += "Relevant henvisning:\n";
-        text += `${relevantRef.hospital} - ${relevantRef.department}\nGrunn: ${relevantRef.reason}\nNotater: ${relevantRef.notes}\n\n`;
-    }
-
-    if(relevantApp){
-        text += "Relevant time:\n";
-        text += `${relevantApp.date} ${relevantApp.time} - ${relevantApp.reason}\nNotater: ${relevantApp.notes}\n\n`;
-    }
-
-    epikriseText.innerText += text;
-
     const epikrisers = JSON.parse(localStorage.getItem("epikriser")||"[]");
     epikrisers.push({patientId,title,diagnosis,anamnesis,plan,doctor,relevantRef,relevantApp});
     localStorage.setItem("epikriser", JSON.stringify(epikrisers));
+
+    renderEpikriser();
 
     epiTitle.value=""; epiDiagnosis.value=""; epiAnamnesis.value=""; epiPlan.value=""; epiDoctor.value=""; epiRefSelect.value=""; epiTimeSelect.value="";
 }
@@ -223,7 +245,8 @@ renderReferrals();
 renderMedications();
 loadReferralOptions();
 loadAppointmentOptions();
-</script>
+renderEpikriser();
 
+</script>
 </body>
 </html>
