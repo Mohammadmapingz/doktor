@@ -6,7 +6,7 @@
 <style>
 body { font-family: Arial; margin:20px; background:#f5f5f5; }
 .container { max-width:1000px; margin:auto; background:white; padding:20px; }
-h2 { text-align:center; }
+h2,h3 { text-align:center; }
 input, textarea, select { width:100%; padding:6px; margin:5px 0; }
 textarea { height:80px; }
 button { padding:8px; margin:5px 0; cursor:pointer; }
@@ -48,11 +48,17 @@ button { padding:8px; margin:5px 0; cursor:pointer; }
 <button onclick="addMedication()">Legg til resept</button>
 <div id="medicationList"></div>
 
-<h3>Epikrise (tekst)</h3>
+<h3>Epikrise (tekstfelt)</h3>
 <input id="epiTitle" placeholder="Tittel">
 <input id="epiDiagnosis" placeholder="Diagnoser">
 <textarea id="epiAnamnesis" placeholder="Anamnese"></textarea>
 <textarea id="epiPlan" placeholder="Framtidsplan"></textarea>
+
+<label for="epiRefSelect">Velg relevant henvisning:</label>
+<select id="epiRefSelect"></select>
+
+<input id="epiDoctor" placeholder="Lege som skriver epikrise">
+
 <button onclick="addEpikrise()">Legg til Epikrise</button>
 <div id="epikriseText"></div>
 
@@ -63,11 +69,15 @@ const patientId = new URLSearchParams(location.search).get('id');
 let patients = JSON.parse(localStorage.getItem("patients")||"[]");
 let patient = patients.find(p=>p.id==patientId) || {fullname:"Ukjent", fnr:"", address:"", postcode:"", city:""};
 
+// Medisiner forslag
+const meds = ["Nexium","Montelukast","Paracet","Ibux","Voltaren","Prednisolon","Amoxicillin"];
+
+// --- PASIENTINFO ---
 function updatePatientInfo(){
     patientInfo.innerText = `Navn: ${patient.fullname}\nFødselsnummer: ${patient.fnr}\nAdresse: ${patient.address}, ${patient.postcode} ${patient.city}\nOverlege: Mohammad Arkan Osman\nAkershus universitetssykehus HF, Øre-nese-hals poliklinikk`;
 }
 
-// Timer
+// --- TIMER ---
 function addAppointment(){
     const date = appointmentDate.value;
     const time = appointmentTime.value;
@@ -92,7 +102,7 @@ function renderAppointments(){
     });
 }
 
-// Henvisninger
+// --- HENVISNINGER ---
 function addReferral(){
     const hospital = refHospital.value;
     const department = refDepartment.value;
@@ -103,6 +113,7 @@ function addReferral(){
     referrals.push({patientId,hospital,department,reason,notes});
     localStorage.setItem("referrals", JSON.stringify(referrals));
     renderReferrals();
+    loadReferralOptions();
     refHospital.value=""; refDepartment.value=""; refReason.value=""; refNotes.value="";
 }
 
@@ -117,8 +128,7 @@ function renderReferrals(){
     });
 }
 
-// Resepter
-const meds = ["Nexium","Montelukast","Paracet","Ibux","Voltaren","Prednisolon","Amoxicillin"];
+// --- RESEPTER ---
 function addMedication(){
     const med = medicationInput.value;
     const notes = medicationNotes.value;
@@ -142,36 +152,60 @@ function renderMedications(){
     });
 }
 
-// Epikrise
+// --- EPIKRISE ---
+function loadReferralOptions(){
+    const refs = JSON.parse(localStorage.getItem("referrals")||"[]").filter(r=>r.patientId==patientId);
+    epiRefSelect.innerHTML = "<option value=''>Ingen</option>";
+    refs.forEach((r,i)=>{
+        epiRefSelect.innerHTML += `<option value="${i}">${r.hospital} - ${r.department} - ${r.reason}</option>`;
+    });
+}
+
 function addEpikrise(){
     const title = epiTitle.value;
     const diagnosis = epiDiagnosis.value;
     const anamnesis = epiAnamnesis.value;
     const plan = epiPlan.value;
+    const doctor = epiDoctor.value || "Ukjent lege";
+
+    const refs = JSON.parse(localStorage.getItem("referrals")||"[]").filter(r=>r.patientId==patientId);
+    const selectedIndex = epiRefSelect.value;
+    const relevantRef = selectedIndex !== "" ? refs[selectedIndex] : null;
 
     let text = "======================\n";
     text += "EPIKRISE\n";
     text += `Pasient: ${patient.fullname}\nFødselsnummer: ${patient.fnr}\nAdresse: ${patient.address}, ${patient.postcode} ${patient.city}\n`;
-    text += "Overlege: Mohammad Arkan Osman\nAkershus universitetssykehus HF, Øre-nese-hals poliklinikk\n\n";
+    text += `Overlege: ${doctor}\nAkershus universitetssykehus HF, Øre-nese-hals poliklinikk\n\n`;
     text += `Tittel: ${title}\nDiagnoser: ${diagnosis}\nAnamnese: ${anamnesis}\nPlan: ${plan}\n\n`;
+
+    if(relevantRef){
+        text += "Relevant henvisning:\n";
+        text += `${relevantRef.hospital} - ${relevantRef.department}\nGrunn: ${relevantRef.reason}\nNotater: ${relevantRef.notes}\n\n`;
+    }
 
     // Timer
     const appointments = JSON.parse(localStorage.getItem("appointments")||"[]").filter(a=>a.patientId==patientId);
-    if(appointments.length>0){ text += "Timer:\n"; appointments.forEach(a=>{text+=`${a.date} ${a.time} - ${a.reason}\n`}); text+="\n"; }
-
-    // Henvisninger
-    const referrals = JSON.parse(localStorage.getItem("referrals")||"[]").filter(r=>r.patientId==patientId);
-    if(referrals.length>0){ text += "Henvisninger:\n"; referrals.forEach(r=>{text+=`${r.hospital} - ${r.department} - ${r.reason}\n`}); text+="\n"; }
+    if(appointments.length>0){ 
+        text += "Timer:\n"; 
+        appointments.forEach(a=>{text+=`${a.date} ${a.time} - ${a.reason}\n`}); 
+        text+="\n"; 
+    }
 
     epikriseText.innerText += text;
 
-    epiTitle.value=""; epiDiagnosis.value=""; epiAnamnesis.value=""; epiPlan.value="";
+    const epikrisers = JSON.parse(localStorage.getItem("epikriser")||"[]");
+    epikrisers.push({patientId,title,diagnosis,anamnesis,plan,doctor,relevantRef});
+    localStorage.setItem("epikriser", JSON.stringify(epikrisers));
+
+    epiTitle.value=""; epiDiagnosis.value=""; epiAnamnesis.value=""; epiPlan.value=""; epiDoctor.value=""; epiRefSelect.value="";
 }
 
+// --- INIT ---
 updatePatientInfo();
 renderAppointments();
 renderReferrals();
 renderMedications();
+loadReferralOptions();
 </script>
 
 </body>
