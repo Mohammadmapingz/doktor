@@ -2,176 +2,202 @@
 <html lang="no">
 <head>
 <meta charset="UTF-8">
-<title>Pasientjournal</title>
+<title>Henvisning Avansert</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
 <style>
 body { font-family: Arial; margin:20px; background:#f5f5f5; }
-.container { max-width:1000px; margin:auto; background:white; padding:20px; }
+
+.container {
+  max-width:900px;
+  margin:auto;
+  background:white;
+  padding:20px;
+}
+
 h2 { text-align:center; }
-input, textarea, select { width:100%; padding:6px; margin:5px 0; }
-textarea { height:80px; }
-button { padding:8px; margin:5px 0; cursor:pointer; }
-.card { border:1px solid #ccc; padding:10px; margin:10px 0; background:#fafafa; white-space: pre-line; }
-.autocomplete-suggestions { border:1px solid #ccc; background:white; position:absolute; z-index:1000; max-height:100px; overflow-y:auto; }
-.autocomplete-suggestion { padding:4px; cursor:pointer; }
-.autocomplete-suggestion:hover { background:#eee; }
+
+input, select, textarea {
+  width:100%;
+  padding:6px;
+  margin:5px 0;
+}
+
+textarea { height:100px; }
+
+button {
+  padding:8px;
+  margin:5px 0;
+  cursor:pointer;
+}
+
+.card {
+  border:1px solid #ccc;
+  padding:10px;
+  margin:10px 0;
+  background:#fafafa;
+  white-space: pre-line;
+}
 </style>
 </head>
+
 <body>
 
 <div class="container">
-<h2>Pasientjournal</h2>
 
-<h3>Pasientinfo</h3>
-<div id="patientInfo"></div>
+<h2>Henvisning</h2>
 
-<h3>Timer</h3>
-<input id="appointmentDate" type="date">
-<input id="appointmentTime" type="time">
-<input id="appointmentReason" placeholder="Grunn for time">
-<textarea id="appointmentNotes" placeholder="Notater"></textarea>
-<button onclick="addAppointment()">Legg til time</button>
-<div id="appointmentsList"></div>
+<input id="hospital" placeholder="Sykehus (f.eks Ahus)">
+<input id="department" placeholder="Avdeling">
+<input id="reason" placeholder="Grunn for henvisning">
+<textarea id="notes" placeholder="Notater"></textarea>
 
-<h3>Henvisninger</h3>
-<input id="refHospital" placeholder="Sykehus">
-<input id="refDepartment" placeholder="Avdeling">
-<input id="refReason" placeholder="Grunn for henvisning">
-<textarea id="refNotes" placeholder="Notater"></textarea>
-<button onclick="addReferral()">Legg til henvisning</button>
-<div id="referralsList"></div>
+<h3>Legg ved tidligere epikrise (som tekst)</h3>
+<select id="journalSelect"></select>
 
-<h3>Rekvirerte resepter</h3>
-<input id="medicationInput" placeholder="Skriv medisin...">
-<div id="autocomplete" class="autocomplete-suggestions"></div>
-<input id="medicationNotes" placeholder="Notater">
-<input id="medicationCode" placeholder="Sikkerhetskode">
-<button onclick="addMedication()">Legg til resept</button>
-<div id="medicationList"></div>
+<button onclick="saveReferral()">Lagre henvisning</button>
+<button onclick="createEpikrise()">Lag Epikrise (tekstfelt)</button>
+<button onclick="generatePDF()">Last ned PDF av henvisning</button>
 
-<h3>Epikrise (tekst)</h3>
-<input id="epiTitle" placeholder="Tittel">
-<input id="epiDiagnosis" placeholder="Diagnoser">
-<textarea id="epiAnamnesis" placeholder="Anamnese"></textarea>
-<textarea id="epiPlan" placeholder="Framtidsplan"></textarea>
-<button onclick="addEpikrise()">Legg til Epikrise</button>
+<h3>Tidligere henvisninger</h3>
+<div id="refList"></div>
+
+<h3>Epikrise tekstfelt</h3>
 <div id="epikriseText"></div>
 
 </div>
 
 <script>
+const { jsPDF } = window.jspdf;
+
+// PASIENT
 const patientId = new URLSearchParams(location.search).get('id');
 let patients = JSON.parse(localStorage.getItem("patients")||"[]");
-let patient = patients.find(p=>p.id==patientId) || {fullname:"Ukjent", fnr:"", address:"", postcode:"", city:""};
+let patient = patients.find(p => p.id == patientId) || {fullname:"Ukjent", fnr:"", address:"", postcode:"", city:""};
 
-function updatePatientInfo(){
-    patientInfo.innerText = `Navn: ${patient.fullname}\nFødselsnummer: ${patient.fnr}\nAdresse: ${patient.address}, ${patient.postcode} ${patient.city}\nOverlege: Mohammad Arkan Osman\nAkershus universitetssykehus HF, Øre-nese-hals poliklinikk`;
+// LOAD JOURNAL OPTIONS
+function loadJournalOptions(){
+  let journals = JSON.parse(localStorage.getItem("journal")||"[]").filter(j => j.patientId==patientId);
+  journalSelect.innerHTML = "<option value=''>Ingen</option>";
+  journals.forEach((j,i)=>{
+    journalSelect.innerHTML += `<option value="${i}">${j.title} (${j.date || ""})</option>`;
+  });
 }
 
-// Timer
-function addAppointment(){
-    const date = appointmentDate.value;
-    const time = appointmentTime.value;
-    const reason = appointmentReason.value;
-    const notes = appointmentNotes.value;
+// SAVE HENVISNING
+function saveReferral(){
+  let refs = JSON.parse(localStorage.getItem("referrals")||"[]");
+  let journals = JSON.parse(localStorage.getItem("journal")||"[]").filter(j => j.patientId==patientId);
+  let selected = journalSelect.value;
+  let attached = selected !== "" ? journals[selected] : null;
 
-    const appointments = JSON.parse(localStorage.getItem("appointments")||"[]");
-    appointments.push({patientId,date,time,reason,notes});
-    localStorage.setItem("appointments", JSON.stringify(appointments));
-    renderAppointments();
-    appointmentDate.value=""; appointmentTime.value=""; appointmentReason.value=""; appointmentNotes.value="";
+  refs.push({
+    patientId,
+    hospital: hospital.value,
+    department: department.value,
+    reason: reason.value,
+    notes: notes.value,
+    attached
+  });
+  localStorage.setItem("referrals", JSON.stringify(refs));
+  loadReferrals();
 }
 
-function renderAppointments(){
-    const appointments = JSON.parse(localStorage.getItem("appointments")||"[]").filter(a=>a.patientId==patientId);
-    appointmentsList.innerHTML = "";
-    appointments.forEach(a=>{
-        const div = document.createElement("div");
-        div.className="card";
-        div.innerText = `${a.date} ${a.time} - ${a.reason}\n${a.notes}`;
-        appointmentsList.appendChild(div);
-    });
+// CREATE EPIKRISE (TEKST)
+function createEpikrise(){
+  let j = JSON.parse(localStorage.getItem("journal")||"[]");
+  let selected = journalSelect.value;
+  let attached = selected !== "" ? j.filter(jj=>jj.patientId==patientId)[selected] : null;
+
+  let text = "";
+  text += "======================\n";
+  text += "EPIKRISE\n";
+  text += "Pasient: " + patient.fullname + "\n";
+  text += "Fødselsnummer: " + patient.fnr + "\n";
+  text += "Adresse: " + patient.address + ", " + patient.postcode + " " + patient.city + "\n";
+  text += "Overlege: Mohammad Arkan Osman\n";
+  text += "Akershus universitetssykehus HF, Øre-nese-hals poliklinikk\n\n";
+
+  text += "Grunn for henvisning: " + reason.value + "\n";
+  text += "Notater: " + notes.value + "\n\n";
+
+  if(attached){
+    text += "Vedlagt tidligere epikrise:\n";
+    text += "Tittel: " + attached.title + "\n";
+    text += "Diagnoser: " + attached.diagnosis + "\n";
+    text += "Anamnese: " + attached.anamnesis + "\n";
+    text += "Plan: " + attached.plan + "\n\n";
+  }
+
+  text += "======================\n";
+
+  epikriseText.innerText = text;
 }
 
-// Henvisninger
-function addReferral(){
-    const hospital = refHospital.value;
-    const department = refDepartment.value;
-    const reason = refReason.value;
-    const notes = refNotes.value;
-
-    const referrals = JSON.parse(localStorage.getItem("referrals")||"[]");
-    referrals.push({patientId,hospital,department,reason,notes});
-    localStorage.setItem("referrals", JSON.stringify(referrals));
-    renderReferrals();
-    refHospital.value=""; refDepartment.value=""; refReason.value=""; refNotes.value="";
+// LOAD REFERRALS
+function loadReferrals(){
+  let refs = JSON.parse(localStorage.getItem("referrals")||"[]").filter(r=>r.patientId==patientId);
+  refList.innerHTML="";
+  refs.forEach(r=>{
+    const div = document.createElement("div");
+    div.className="card";
+    let attachedText = r.attached ? "\nVedlagt epikrise: " + r.attached.title : "";
+    div.innerText = `${r.hospital} - ${r.department}\nGrunn: ${r.reason}${attachedText}`;
+    refList.appendChild(div);
+  });
 }
 
-function renderReferrals(){
-    const referrals = JSON.parse(localStorage.getItem("referrals")||"[]").filter(r=>r.patientId==patientId);
-    referralsList.innerHTML="";
-    referrals.forEach(r=>{
-        const div = document.createElement("div");
-        div.className="card";
-        div.innerText = `${r.hospital} - ${r.department}\n${r.reason}\n${r.notes}`;
-        referralsList.appendChild(div);
-    });
+// GENERATE PDF (HENVISNING)
+function generatePDF(){
+  let refs = JSON.parse(localStorage.getItem("referrals")||"[]").filter(r=>r.patientId==patientId);
+  if(refs.length==0){ alert("Ingen henvisning å lage PDF av"); return;}
+  let ref = refs[refs.length-1]; // siste henvisning
+
+  const doc = new jsPDF();
+  let y=10;
+  function line(txt,size=11){
+    doc.setFontSize(size);
+    let split = doc.splitTextToSize(txt,180);
+    doc.text(split,10,y);
+    y+=split.length*7;
+  }
+
+  // HEADER FAST
+  line("Akershus universitetssykehus HF",12);
+  line("Øre-nese-hals poliklinikk",12);
+  line("Overlege Mohammad Arkan Osman",12);
+  y+=5;
+
+  line("Pasient: " + patient.fullname);
+  line("Fødselsnummer: " + patient.fnr);
+  line("Adresse: " + patient.address + ", " + patient.postcode + " " + patient.city);
+  y+=5;
+
+  line("Sykehus: " + ref.hospital);
+  line("Avdeling: " + ref.department);
+  line("Grunn: " + ref.reason);
+  line("Notater: " + ref.notes);
+  y+=5;
+
+  if(ref.attached){
+    line("Vedlagt epikrise:");
+    line("Tittel: " + ref.attached.title);
+    line("Diagnoser: " + ref.attached.diagnosis);
+    line("Anamnese: " + ref.attached.anamnesis);
+    line("Plan: " + ref.attached.plan);
+    y+=5;
+  }
+
+  doc.setFontSize(8);
+  doc.text("-----------------------", 10, 280);
+  doc.text("Akershus universitetssykehus org nr postboks 1478 Lørenskog www.ahus.no",10,285);
+
+  doc.save("henvisning.pdf");
 }
 
-// Resepter
-const meds = ["Nexium","Montelukast","Paracet","Ibux","Voltaren","Prednisolon","Amoxicillin"];
-function addMedication(){
-    const med = medicationInput.value;
-    const notes = medicationNotes.value;
-    const code = medicationCode.value;
-
-    const medications = JSON.parse(localStorage.getItem("medications")||"[]");
-    medications.push({patientId,med,notes,code});
-    localStorage.setItem("medications", JSON.stringify(medications));
-    renderMedications();
-    medicationInput.value=""; medicationNotes.value=""; medicationCode.value="";
-}
-
-function renderMedications(){
-    const medications = JSON.parse(localStorage.getItem("medications")||"[]").filter(m=>m.patientId==patientId);
-    medicationList.innerHTML="";
-    medications.forEach(m=>{
-        const div = document.createElement("div");
-        div.className="card";
-        div.innerText = `${m.med} - Notater: ${m.notes} - Kode: ${m.code}`;
-        medicationList.appendChild(div);
-    });
-}
-
-// Epikrise
-function addEpikrise(){
-    const title = epiTitle.value;
-    const diagnosis = epiDiagnosis.value;
-    const anamnesis = epiAnamnesis.value;
-    const plan = epiPlan.value;
-
-    let text = "======================\n";
-    text += "EPIKRISE\n";
-    text += `Pasient: ${patient.fullname}\nFødselsnummer: ${patient.fnr}\nAdresse: ${patient.address}, ${patient.postcode} ${patient.city}\n`;
-    text += "Overlege: Mohammad Arkan Osman\nAkershus universitetssykehus HF, Øre-nese-hals poliklinikk\n\n";
-    text += `Tittel: ${title}\nDiagnoser: ${diagnosis}\nAnamnese: ${anamnesis}\nPlan: ${plan}\n\n`;
-
-    // Timer
-    const appointments = JSON.parse(localStorage.getItem("appointments")||"[]").filter(a=>a.patientId==patientId);
-    if(appointments.length>0){ text += "Timer:\n"; appointments.forEach(a=>{text+=`${a.date} ${a.time} - ${a.reason}\n`}); text+="\n"; }
-
-    // Henvisninger
-    const referrals = JSON.parse(localStorage.getItem("referrals")||"[]").filter(r=>r.patientId==patientId);
-    if(referrals.length>0){ text += "Henvisninger:\n"; referrals.forEach(r=>{text+=`${r.hospital} - ${r.department} - ${r.reason}\n`}); text+="\n"; }
-
-    epikriseText.innerText += text;
-
-    epiTitle.value=""; epiDiagnosis.value=""; epiAnamnesis.value=""; epiPlan.value="";
-}
-
-updatePatientInfo();
-renderAppointments();
-renderReferrals();
-renderMedications();
+// INIT
+loadJournalOptions();
+loadReferrals();
 </script>
 
 </body>
