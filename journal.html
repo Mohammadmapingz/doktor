@@ -2,269 +2,176 @@
 <html lang="no">
 <head>
 <meta charset="UTF-8">
-<title>Journal System</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-
+<title>Pasientjournal</title>
 <style>
-body { font-family: Arial; margin:0; display:flex; }
-
-/* SIDEBAR */
-.sidebar {
-  width:220px;
-  background:#1f2d3d;
-  color:white;
-  height:100vh;
-  padding:15px;
-}
-
-.sidebar h2 { color:#fff; }
-.sidebar button {
-  width:100%;
-  margin:5px 0;
-  padding:10px;
-  border:none;
-  background:#34495e;
-  color:white;
-  cursor:pointer;
-}
-
-/* MAIN */
-.main {
-  flex:1;
-  padding:20px;
-  background:#f5f5f5;
-}
-
-.card {
-  background:white;
-  padding:10px;
-  margin:10px 0;
-  border:1px solid #ccc;
-}
-
-input, textarea {
-  width:100%;
-  margin:5px 0;
-  padding:6px;
-}
-
-textarea { height:60px; }
-
-button { cursor:pointer; padding:6px; }
+body { font-family: Arial; margin:20px; background:#f5f5f5; }
+.container { max-width:1000px; margin:auto; background:white; padding:20px; }
+h2 { text-align:center; }
+input, textarea, select { width:100%; padding:6px; margin:5px 0; }
+textarea { height:80px; }
+button { padding:8px; margin:5px 0; cursor:pointer; }
+.card { border:1px solid #ccc; padding:10px; margin:10px 0; background:#fafafa; white-space: pre-line; }
+.autocomplete-suggestions { border:1px solid #ccc; background:white; position:absolute; z-index:1000; max-height:100px; overflow-y:auto; }
+.autocomplete-suggestion { padding:4px; cursor:pointer; }
+.autocomplete-suggestion:hover { background:#eee; }
 </style>
 </head>
-
 <body>
 
-<!-- SIDEBAR -->
-<div class="sidebar">
-  <h2>Journal</h2>
-  <button onclick="showSection('journal')">Journal</button>
-  <button onclick="showSection('appointments')">Timer</button>
-  <button onclick="showSection('calendar')">Kalender</button>
-  <button onclick="showSection('referrals')">Henvisning</button>
-  <button onclick="showSection('prescriptions')">Resept</button>
-</div>
+<div class="container">
+<h2>Pasientjournal</h2>
 
-<!-- MAIN -->
-<div class="main">
-
-<!-- LOGIN -->
-<div id="login">
-  <h2>Logg inn</h2>
-  <input id="code" placeholder="Kode">
-  <button onclick="login()">Logg inn</button>
-</div>
-
-<!-- APP -->
-<div id="app" style="display:none">
-
-<h1>Pasientjournal</h1>
+<h3>Pasientinfo</h3>
 <div id="patientInfo"></div>
 
-<!-- JOURNAL -->
-<div id="journal" class="section">
-<h2>Journal</h2>
-<input id="title" placeholder="Tittel">
-<textarea id="diagnosis" placeholder="Diagnoser"></textarea>
-<textarea id="anamnesis" placeholder="Anamnese"></textarea>
-<textarea id="plan" placeholder="Plan"></textarea>
-<button onclick="saveJournal()">Lagre</button>
-<div id="journals"></div>
-</div>
-
-<!-- TIMER -->
-<div id="appointments" class="section" style="display:none">
-<h2>Timer</h2>
-<input id="date" placeholder="Dato">
-<input id="time" placeholder="Tid">
-<input id="reason" placeholder="Grunn">
-<button onclick="saveAppointment()">Lagre</button>
+<h3>Timer</h3>
+<input id="appointmentDate" type="date">
+<input id="appointmentTime" type="time">
+<input id="appointmentReason" placeholder="Grunn for time">
+<textarea id="appointmentNotes" placeholder="Notater"></textarea>
+<button onclick="addAppointment()">Legg til time</button>
 <div id="appointmentsList"></div>
-</div>
 
-<!-- KALENDER -->
-<div id="calendar" class="section" style="display:none">
-<h2>Kalender</h2>
-<div id="calendarList"></div>
-</div>
+<h3>Henvisninger</h3>
+<input id="refHospital" placeholder="Sykehus">
+<input id="refDepartment" placeholder="Avdeling">
+<input id="refReason" placeholder="Grunn for henvisning">
+<textarea id="refNotes" placeholder="Notater"></textarea>
+<button onclick="addReferral()">Legg til henvisning</button>
+<div id="referralsList"></div>
 
-<!-- HENVISNING -->
-<div id="referrals" class="section" style="display:none">
-<h2>Henvisning</h2>
-<input id="hospital" placeholder="Sykehus">
-<input id="dept" placeholder="Avdeling">
-<input id="refReason" placeholder="Grunn">
-<button onclick="saveReferral()">Lagre</button>
-<button onclick="makeEpikrise()">Lag epikrise</button>
-<div id="refList"></div>
-</div>
+<h3>Rekvirerte resepter</h3>
+<input id="medicationInput" placeholder="Skriv medisin...">
+<div id="autocomplete" class="autocomplete-suggestions"></div>
+<input id="medicationNotes" placeholder="Notater">
+<input id="medicationCode" placeholder="Sikkerhetskode">
+<button onclick="addMedication()">Legg til resept</button>
+<div id="medicationList"></div>
 
-<!-- RESEPT -->
-<div id="prescriptions" class="section" style="display:none">
-<h2>Resept</h2>
-<input id="medInput" placeholder="Medisin (Nexium...)">
-<input id="type" placeholder="Blå / Hvit">
-<textarea id="note" placeholder="Notater"></textarea>
-<input id="code1518" placeholder="Kode 1518">
-<button onclick="savePrescription()">Lagre resept</button>
-<div id="presList"></div>
-</div>
+<h3>Epikrise (tekst)</h3>
+<input id="epiTitle" placeholder="Tittel">
+<input id="epiDiagnosis" placeholder="Diagnoser">
+<textarea id="epiAnamnesis" placeholder="Anamnese"></textarea>
+<textarea id="epiPlan" placeholder="Framtidsplan"></textarea>
+<button onclick="addEpikrise()">Legg til Epikrise</button>
+<div id="epikriseText"></div>
 
-</div>
 </div>
 
 <script>
-const { jsPDF } = window.jspdf;
-
-// LOGIN
-function login(){
-  if(document.getElementById("code").value=="1234"){
-    document.getElementById("login").style.display="none";
-    document.getElementById("app").style.display="block";
-  } else alert("Feil kode");
-}
-
-// NAV
-function showSection(id){
-  document.querySelectorAll(".section").forEach(s=>s.style.display="none");
-  document.getElementById(id).style.display="block";
-}
-
-// PASIENT
 const patientId = new URLSearchParams(location.search).get('id');
 let patients = JSON.parse(localStorage.getItem("patients")||"[]");
-let patient = patients.find(p=>p.id==patientId) || {fullname:"Test Pasient"};
+let patient = patients.find(p=>p.id==patientId) || {fullname:"Ukjent", fnr:"", address:"", postcode:"", city:""};
 
-document.getElementById("patientInfo").innerHTML = patient.fullname;
-
-// JOURNAL
-function saveJournal(){
-  let j = JSON.parse(localStorage.getItem("journal")||"[]");
-  j.push({patientId,title:title.value,diagnosis:diagnosis.value,anamnesis:anamnesis.value,plan:plan.value});
-  localStorage.setItem("journal",JSON.stringify(j));
-  loadJournal();
+function updatePatientInfo(){
+    patientInfo.innerText = `Navn: ${patient.fullname}\nFødselsnummer: ${patient.fnr}\nAdresse: ${patient.address}, ${patient.postcode} ${patient.city}\nOverlege: Mohammad Arkan Osman\nAkershus universitetssykehus HF, Øre-nese-hals poliklinikk`;
 }
 
-function loadJournal(){
-  let j = JSON.parse(localStorage.getItem("journal")||"[]").filter(x=>x.patientId==patientId);
-  journals.innerHTML="";
-  j.forEach((a,i)=>{
-    journals.innerHTML+=`<div class="card">${a.title}<br><button onclick="pdf(${i})">PDF</button></div>`;
-  });
+// Timer
+function addAppointment(){
+    const date = appointmentDate.value;
+    const time = appointmentTime.value;
+    const reason = appointmentReason.value;
+    const notes = appointmentNotes.value;
+
+    const appointments = JSON.parse(localStorage.getItem("appointments")||"[]");
+    appointments.push({patientId,date,time,reason,notes});
+    localStorage.setItem("appointments", JSON.stringify(appointments));
+    renderAppointments();
+    appointmentDate.value=""; appointmentTime.value=""; appointmentReason.value=""; appointmentNotes.value="";
 }
 
-// PDF
-function pdf(i){
-  let j = JSON.parse(localStorage.getItem("journal")||"[]").filter(x=>x.patientId==patientId);
-  let d = j[i];
-  const doc=new jsPDF();
-  doc.text("EPIKRISE",10,10);
-  doc.text(patient.fullname,10,20);
-  doc.text(d.title,10,30);
-  doc.save("epikrise.pdf");
+function renderAppointments(){
+    const appointments = JSON.parse(localStorage.getItem("appointments")||"[]").filter(a=>a.patientId==patientId);
+    appointmentsList.innerHTML = "";
+    appointments.forEach(a=>{
+        const div = document.createElement("div");
+        div.className="card";
+        div.innerText = `${a.date} ${a.time} - ${a.reason}\n${a.notes}`;
+        appointmentsList.appendChild(div);
+    });
 }
 
-// TIMER
-function saveAppointment(){
-  let a = JSON.parse(localStorage.getItem("appointments")||"[]");
-  a.push({patientId,date:date.value,time:time.value,reason:reason.value});
-  localStorage.setItem("appointments",JSON.stringify(a));
-  loadAppointments();
-  loadCalendar();
+// Henvisninger
+function addReferral(){
+    const hospital = refHospital.value;
+    const department = refDepartment.value;
+    const reason = refReason.value;
+    const notes = refNotes.value;
+
+    const referrals = JSON.parse(localStorage.getItem("referrals")||"[]");
+    referrals.push({patientId,hospital,department,reason,notes});
+    localStorage.setItem("referrals", JSON.stringify(referrals));
+    renderReferrals();
+    refHospital.value=""; refDepartment.value=""; refReason.value=""; refNotes.value="";
 }
 
-function loadAppointments(){
-  let a = JSON.parse(localStorage.getItem("appointments")||"[]").filter(x=>x.patientId==patientId);
-  appointmentsList.innerHTML="";
-  a.forEach(x=>{
-    appointmentsList.innerHTML+=`<div class="card">${x.date} ${x.time} - ${x.reason}</div>`;
-  });
+function renderReferrals(){
+    const referrals = JSON.parse(localStorage.getItem("referrals")||"[]").filter(r=>r.patientId==patientId);
+    referralsList.innerHTML="";
+    referrals.forEach(r=>{
+        const div = document.createElement("div");
+        div.className="card";
+        div.innerText = `${r.hospital} - ${r.department}\n${r.reason}\n${r.notes}`;
+        referralsList.appendChild(div);
+    });
 }
 
-// KALENDER
-function loadCalendar(){
-  let a = JSON.parse(localStorage.getItem("appointments")||"[]");
-  calendarList.innerHTML="";
-  a.forEach(x=>{
-    calendarList.innerHTML+=`<div class="card">${x.time} - ${x.reason}</div>`;
-  });
+// Resepter
+const meds = ["Nexium","Montelukast","Paracet","Ibux","Voltaren","Prednisolon","Amoxicillin"];
+function addMedication(){
+    const med = medicationInput.value;
+    const notes = medicationNotes.value;
+    const code = medicationCode.value;
+
+    const medications = JSON.parse(localStorage.getItem("medications")||"[]");
+    medications.push({patientId,med,notes,code});
+    localStorage.setItem("medications", JSON.stringify(medications));
+    renderMedications();
+    medicationInput.value=""; medicationNotes.value=""; medicationCode.value="";
 }
 
-// HENVISNING
-function saveReferral(){
-  let r = JSON.parse(localStorage.getItem("referrals")||"[]");
-  r.push({patientId,hospital:hospital.value,dept:dept.value,reason:refReason.value});
-  localStorage.setItem("referrals",JSON.stringify(r));
-  loadRef();
+function renderMedications(){
+    const medications = JSON.parse(localStorage.getItem("medications")||"[]").filter(m=>m.patientId==patientId);
+    medicationList.innerHTML="";
+    medications.forEach(m=>{
+        const div = document.createElement("div");
+        div.className="card";
+        div.innerText = `${m.med} - Notater: ${m.notes} - Kode: ${m.code}`;
+        medicationList.appendChild(div);
+    });
 }
 
-function makeEpikrise(){
-  let j = JSON.parse(localStorage.getItem("journal")||"[]");
-  j.push({patientId,title:"Henvisning",diagnosis:refReason.value});
-  localStorage.setItem("journal",JSON.stringify(j));
-  loadJournal();
+// Epikrise
+function addEpikrise(){
+    const title = epiTitle.value;
+    const diagnosis = epiDiagnosis.value;
+    const anamnesis = epiAnamnesis.value;
+    const plan = epiPlan.value;
+
+    let text = "======================\n";
+    text += "EPIKRISE\n";
+    text += `Pasient: ${patient.fullname}\nFødselsnummer: ${patient.fnr}\nAdresse: ${patient.address}, ${patient.postcode} ${patient.city}\n`;
+    text += "Overlege: Mohammad Arkan Osman\nAkershus universitetssykehus HF, Øre-nese-hals poliklinikk\n\n";
+    text += `Tittel: ${title}\nDiagnoser: ${diagnosis}\nAnamnese: ${anamnesis}\nPlan: ${plan}\n\n`;
+
+    // Timer
+    const appointments = JSON.parse(localStorage.getItem("appointments")||"[]").filter(a=>a.patientId==patientId);
+    if(appointments.length>0){ text += "Timer:\n"; appointments.forEach(a=>{text+=`${a.date} ${a.time} - ${a.reason}\n`}); text+="\n"; }
+
+    // Henvisninger
+    const referrals = JSON.parse(localStorage.getItem("referrals")||"[]").filter(r=>r.patientId==patientId);
+    if(referrals.length>0){ text += "Henvisninger:\n"; referrals.forEach(r=>{text+=`${r.hospital} - ${r.department} - ${r.reason}\n`}); text+="\n"; }
+
+    epikriseText.innerText += text;
+
+    epiTitle.value=""; epiDiagnosis.value=""; epiAnamnesis.value=""; epiPlan.value="";
 }
 
-function loadRef(){
-  let r = JSON.parse(localStorage.getItem("referrals")||"[]").filter(x=>x.patientId==patientId);
-  refList.innerHTML="";
-  r.forEach(x=>{
-    refList.innerHTML+=`<div class="card">${x.hospital} - ${x.dept}</div>`;
-  });
-}
-
-// RESEPT
-const meds = ["Nexium","Montelukast","Paracet"];
-
-medInput.addEventListener("input",()=>{
-  let val = medInput.value.toLowerCase();
-  let match = meds.find(m=>m.toLowerCase().startsWith(val));
-  if(match) medInput.value = match;
-});
-
-function savePrescription(){
-  if(code1518.value!="1518"){ alert("Feil kode"); return; }
-  let p = JSON.parse(localStorage.getItem("prescriptions")||"[]");
-  p.push({patientId,med:medInput.value,type:type.value,note:note.value});
-  localStorage.setItem("prescriptions",JSON.stringify(p));
-  loadPres();
-}
-
-function loadPres(){
-  let p = JSON.parse(localStorage.getItem("prescriptions")||"[]").filter(x=>x.patientId==patientId);
-  presList.innerHTML="";
-  p.forEach(x=>{
-    presList.innerHTML+=`<div class="card">${x.med} (${x.type})</div>`;
-  });
-}
-
-// LOAD
-loadJournal();
-loadAppointments();
-loadCalendar();
-loadRef();
-loadPres();
+updatePatientInfo();
+renderAppointments();
+renderReferrals();
+renderMedications();
 </script>
 
 </body>
